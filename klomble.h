@@ -26,7 +26,7 @@ freely, subject to the following restrictions:
 Klomble Links:
 
 GitHub Repository: https://github.com/MrTurtle815/Klomble
-Website: Coming soon :-)
+Website: klomble.com
 
 Made by MrTurtle815
 
@@ -37,7 +37,7 @@ Made by MrTurtle815
 #ifndef KLOMBLE_H
 #define KLOMBLE_H
 
-// namespace
+// namespaec
 
 namespace Klomble {
     struct Vec2 {
@@ -69,7 +69,34 @@ namespace Klomble {
         Space = 0x20, Enter = 0x0D, Escape = 0x1B,
         Left = 0x25, Up = 0x26, Right = 0x27, Down = 0x28
     };
+
+    struct Camera3D {
+        Vec3 position;
+        Vec3 rotation;
+        Vec2 mousePos;
+        Vec2 lastMousePos;
+        float fov;
+
+        Camera3D(
+            Vec3 pos = Vec3(0,0,0),
+            Vec3 rot = Vec3(0,0,0),
+            Vec2 mosPos = Vec2(0,0),
+            Vec2 lastMosPos = Vec2(0,0),
+            float _fov = 60.0f)
+            : position(pos),
+            rotation(rot),
+            mousePos(mosPos),
+            lastMousePos(lastMosPos),
+            fov(_fov)
+        {}
+    };
 }
+
+#define GL_FRAGMENT_SHADER 0x8B30
+#define GL_VERTEX_SHADER 0x8B31
+#define GL_COMPILE_STATUS 0x8B81
+#define GL_LINK_STATUS 0x8B82
+#define GL_INFO_LOG_LENGTH 0x8B84
 
 // klomble functions
 
@@ -95,11 +122,18 @@ void klombleCloseWindow(KlombleWindow* window);
 int klombleUpdate(KlombleWindow* window);
 float klombleGetDeltaTime();
 bool klombleIsKeyDown(int key);
+inline void* klombleLoadGLFunction(const char* name);
 
-#endif
+// camera
+
+void klombleSetActiveCamera(Klomble::Camera3D* cam);
+void klombleUpdateFreeCamera(KlombleWindow* window, Klomble::Camera3D& cam, float speed = 3.0f, float sensitivity = 0.15f);
 
 #ifdef _WIN32
     #include <windows.h>
+    #include <windowsx.h>
+    #include <stdio.h>
+    #include <cmath>
     #include <GL/gl.h>
     #include <stdlib.h>
 #endif
@@ -135,56 +169,95 @@ typedef GLint (APIENTRY *PFNGLGETULOCPROC)(GLuint, const GLchar*);
 typedef void (APIENTRY *PFNGLU2FPROC)(GLint, GLfloat, GLfloat);
 typedef void (APIENTRY *PFNGLU3FPROC)(GLint, GLfloat, GLfloat, GLfloat);
 typedef void (APIENTRY *PFNGLU1FPROC)(GLint, GLfloat);
+typedef void (APIENTRY *PFNGLGETSHADERIVPROC)(GLuint, GLenum, GLint*);
+typedef void (APIENTRY *PFNGLGETSHADERINFOLOGPROC)(GLuint, GLsizei, GLsizei*, GLchar*);
+typedef void (APIENTRY *PFNGLGETPROGRAMIVPROC)(GLuint, GLenum, GLint*);
+typedef void (APIENTRY *PFNGLGETPROGRAMINFOLOGPROC)(GLuint, GLsizei, GLsizei*, GLchar*);
+typedef void (APIENTRY *PFNGLDELETESHADERPROC)(GLuint);
+typedef void (APIENTRY *PFNGLBINDVERTEXARRAYPROC)(GLuint);
 
-static PFNGLGENVAOPROC _glGenVertexArrays;
-static PFNGLBINDVAOPROC _glBindVertexArray;
-static PFNGLGENBUFPROC _glGenBuffers;
-static PFNGLBINDBUFPROC _glBindBuffer;
-static PFNGLBUFDATAPROC _glBufferData;
-static PFNGLVAPPROC _glVertexAttribPointer;
-static PFNGLEVAPROC _glEnableVertexAttribArray;
-static PFNGLCREATESHADERPROC _glCreateShader;
-static PFNGLSHADERSRCPROC _glShaderSource;
-static PFNGLCOMPILEPROC _glCompileShader;
-static PFNGLCREATEPROGPROC _glCreateProgram;
-static PFNGLATTACHPROC _glAttachShader;
-static PFNGLLINKPROC _glLinkProgram;
-static PFNGLUSEPROGPROC _glUseProgram;
-static PFNGLGETULOCPROC _glGetUniformLocation;
-static PFNGLU2FPROC _glUniform2f;
-static PFNGLU3FPROC _glUniform3f;
-static PFNGLU1FPROC _glUniform1f;
+namespace {
 
-static GLuint klomble3DProgram;
-static GLuint klombleCubeVAO, klombleCubeVBO;
-static GLint k3DUOffset, k3DUScale, k3DURotation, k3DUColor, k3DUAspect;
+    // loaded GL entry points
 
-static GLuint klombleProgram, klombleVAO, klombleVBO;
-static GLint klombleUOffset, klombleUScale, klombleUColor, klombleURotation;
-static int klombleGLReady = 0;
+    struct GLFunctions {
+        PFNGLGENVAOPROC genVertexArrays;
+        PFNGLBINDVAOPROC bindVertexArray;
+        PFNGLGENBUFPROC genBuffers;
+        PFNGLBINDBUFPROC bindBuffer;
+        PFNGLBUFDATAPROC bufferData;
+        PFNGLVAPPROC vertexAttribPointer;
+        PFNGLEVAPROC enableVertexAttribArray;
+        PFNGLCREATESHADERPROC createShader;
+        PFNGLSHADERSRCPROC shaderSource;
+        PFNGLCOMPILEPROC compileShader;
+        PFNGLCREATEPROGPROC createProgram;
+        PFNGLATTACHPROC attachShader;
+        PFNGLLINKPROC linkProgram;
+        PFNGLUSEPROGPROC useProgram;
+        PFNGLGETULOCPROC getUniformLocation;
+        PFNGLU2FPROC uniform2f;
+        PFNGLU3FPROC uniform3f;
+        PFNGLU1FPROC uniform1f;
+        PFNGLGETSHADERIVPROC getShaderiv;
+        PFNGLGETSHADERINFOLOGPROC getShaderInfoLog;
+        PFNGLGETPROGRAMIVPROC getProgramiv;
+        PFNGLGETPROGRAMINFOLOGPROC getProgramInfoLog;
+        PFNGLDELETESHADERPROC deleteShader;
+    } gl;
 
-static void klombleInitGL()
+    struct Renderer2D {
+        GLuint program;
+        GLuint vao, vbo;
+        GLint  uOffset, uScale, uColor, uRotation;
+    } renderer2D;
+
+    struct Renderer3D {
+        GLuint program;
+        GLuint cubeVAO, cubeVBO;
+        GLint  uOffset, uScale, uRotation, uColor, uAspect;
+        GLint uCamPos, uCamRot;
+    } renderer3D;
+
+    Klomble::Camera3D* activeCamera = nullptr;
+
+    bool glReady = false;
+
+    void initGL()
 {
-    if (klombleGLReady) return;
+    if (glReady) return;
 
-    _glGenVertexArrays = (PFNGLGENVAOPROC)wglGetProcAddress("glGenVertexArrays");
-    _glBindVertexArray = (PFNGLBINDVAOPROC)wglGetProcAddress("glBindVertexArray");
-    _glGenBuffers = (PFNGLGENBUFPROC)wglGetProcAddress("glGenBuffers");
-    _glBindBuffer = (PFNGLBINDBUFPROC)wglGetProcAddress("glBindBuffer");
-    _glBufferData = (PFNGLBUFDATAPROC)wglGetProcAddress("glBufferData");
-    _glVertexAttribPointer = (PFNGLVAPPROC)wglGetProcAddress("glVertexAttribPointer");
-    _glEnableVertexAttribArray = (PFNGLEVAPROC)wglGetProcAddress("glEnableVertexAttribArray");
-    _glCreateShader = (PFNGLCREATESHADERPROC)wglGetProcAddress("glCreateShader");
-    _glShaderSource = (PFNGLSHADERSRCPROC)wglGetProcAddress("glShaderSource");
-    _glCompileShader = (PFNGLCOMPILEPROC)wglGetProcAddress("glCompileShader");
-    _glCreateProgram = (PFNGLCREATEPROGPROC)wglGetProcAddress("glCreateProgram");
-    _glAttachShader = (PFNGLATTACHPROC)wglGetProcAddress("glAttachShader");
-    _glLinkProgram = (PFNGLLINKPROC)wglGetProcAddress("glLinkProgram");
-    _glUseProgram = (PFNGLUSEPROGPROC)wglGetProcAddress("glUseProgram");
-    _glGetUniformLocation = (PFNGLGETULOCPROC)wglGetProcAddress("glGetUniformLocation");
-    _glUniform2f = (PFNGLU2FPROC)wglGetProcAddress("glUniform2f");
-    _glUniform3f = (PFNGLU3FPROC)wglGetProcAddress("glUniform3f");
-    _glUniform1f = (PFNGLU1FPROC)wglGetProcAddress("glUniform1f");
+    // GL functions
+
+    gl.genVertexArrays = (PFNGLGENVAOPROC)klombleLoadGLFunction("glGenVertexArrays");
+    gl.bindVertexArray = (PFNGLBINDVAOPROC)klombleLoadGLFunction("glBindVertexArray");
+
+    gl.genBuffers = (PFNGLGENBUFPROC)klombleLoadGLFunction("glGenBuffers");
+    gl.bindBuffer = (PFNGLBINDBUFPROC)klombleLoadGLFunction("glBindBuffer");
+    gl.bufferData = (PFNGLBUFDATAPROC)klombleLoadGLFunction("glBufferData");
+
+    gl.vertexAttribPointer = (PFNGLVAPPROC)klombleLoadGLFunction("glVertexAttribPointer");
+    gl.enableVertexAttribArray = (PFNGLEVAPROC)klombleLoadGLFunction("glEnableVertexAttribArray");
+
+    gl.createShader = (PFNGLCREATESHADERPROC)klombleLoadGLFunction("glCreateShader");
+    gl.shaderSource = (PFNGLSHADERSRCPROC)klombleLoadGLFunction("glShaderSource");
+    gl.compileShader = (PFNGLCOMPILEPROC)klombleLoadGLFunction("glCompileShader");
+
+    gl.createProgram = (PFNGLCREATEPROGPROC)klombleLoadGLFunction("glCreateProgram");
+    gl.attachShader = (PFNGLATTACHPROC)klombleLoadGLFunction("glAttachShader");
+    gl.linkProgram = (PFNGLLINKPROC)klombleLoadGLFunction("glLinkProgram");
+    gl.useProgram = (PFNGLUSEPROGPROC)klombleLoadGLFunction("glUseProgram");
+
+    gl.getUniformLocation = (PFNGLGETULOCPROC)klombleLoadGLFunction("glGetUniformLocation");
+
+    gl.uniform2f = (PFNGLU2FPROC)klombleLoadGLFunction("glUniform2f");
+    gl.uniform3f = (PFNGLU3FPROC)klombleLoadGLFunction("glUniform3f");
+    gl.uniform1f = (PFNGLU1FPROC)klombleLoadGLFunction("glUniform1f");
+
+    gl.getShaderiv = (PFNGLGETSHADERIVPROC)klombleLoadGLFunction("glGetShaderiv");
+    gl.getShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC)klombleLoadGLFunction("glGetShaderInfoLog");
+    gl.getProgramiv = (PFNGLGETPROGRAMIVPROC)klombleLoadGLFunction("glGetProgramiv");
+    gl.getProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC)klombleLoadGLFunction("glGetProgramInfoLog");
 
     const char* vertexShader3DSource = R"(#version 330
     layout(location=0) in vec3 aPos;
@@ -193,6 +266,8 @@ static void klombleInitGL()
     uniform vec3 uRotation;
     uniform float uScale;
     uniform float uAspect;
+    uniform vec3 uCamPos;
+    uniform vec3 uCamRot;
 
     void main() {
         vec3 pos = aPos * uScale;
@@ -214,7 +289,29 @@ static void klombleInitGL()
         pos.x = x3; pos.y = y3;
         
         pos += uOffset;
-        
+
+        // camera
+
+        pos -= uCamPos;
+
+        vec3 cameraRotationRadians = radians(-uCamRot);
+        vec3 cameraCos = cos(cameraRotationRadians);
+        vec3 cameraSin = sin(cameraRotationRadians);
+
+        // yaw
+
+        float rotatedX = pos.x * cameraCos.y + pos.z * cameraSin.y;
+        float rotatedZ2 = -pos.x * cameraSin.y + pos.z * cameraCos.y;
+        pos.x = rotatedX;
+        pos.z = rotatedZ2;
+
+        // pitch
+
+        float rotatedY = pos.y * cameraCos.x - pos.z * cameraSin.x;
+        float rotatedZ = pos.y * cameraSin.x + pos.z * cameraCos.x;
+        pos.y = rotatedY;
+        pos.z = rotatedZ;
+
         float zNear = 0.1;
         float zFar = 100.0;
         
@@ -255,23 +352,39 @@ static void klombleInitGL()
 
     glEnable(GL_DEPTH_TEST);
     
-    GLuint vertexShader = _glCreateShader(GL_VERTEX_SHADER);
-    _glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    _glCompileShader(vertexShader);
+    GLuint vertexShader = gl.createShader(GL_VERTEX_SHADER);
+    gl.shaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    gl.compileShader(vertexShader);
 
-    GLuint fragmentShader = _glCreateShader(GL_FRAGMENT_SHADER);
-    _glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    _glCompileShader(fragmentShader);
+    GLint success;
+    gl.getShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char log[1024];
+        gl.getShaderInfoLog(vertexShader, sizeof(log), nullptr, log);
+        printf("Klomble: Vertex shader compilation failed:\n%s\n", log);
+    }
 
-    klombleProgram = _glCreateProgram();
-    _glAttachShader(klombleProgram, vertexShader);
-    _glAttachShader(klombleProgram, fragmentShader);
-    _glLinkProgram(klombleProgram);
+    GLuint fragmentShader = gl.createShader(GL_FRAGMENT_SHADER);
+    gl.shaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    gl.compileShader(fragmentShader);
 
-    klombleUOffset = _glGetUniformLocation(klombleProgram, "uOffset");
-    klombleUScale  = _glGetUniformLocation(klombleProgram, "uScale");
-    klombleUColor  = _glGetUniformLocation(klombleProgram, "uColor");
-    klombleURotation = _glGetUniformLocation(klombleProgram, "uRotation");
+    gl.getShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+
+    if (!success) {
+        char log[1024];
+        gl.getShaderInfoLog(fragmentShader, sizeof(log), nullptr, log);
+        printf("Klomble: Fragment shader compilation failed:\n%s\n", log);
+    }
+
+    renderer2D.program = gl.createProgram();
+    gl.attachShader(renderer2D.program, vertexShader);
+    gl.attachShader(renderer2D.program, fragmentShader);
+    gl.linkProgram(renderer2D.program);
+
+    renderer2D.uOffset = gl.getUniformLocation(renderer2D.program, "uOffset");
+    renderer2D.uScale = gl.getUniformLocation(renderer2D.program, "uScale");
+    renderer2D.uColor = gl.getUniformLocation(renderer2D.program, "uColor");
+    renderer2D.uRotation = gl.getUniformLocation(renderer2D.program, "uRotation");
 
     float shapes[] = {
         // square vertices 0 1 2 3
@@ -288,33 +401,38 @@ static void klombleInitGL()
          0.5f, -0.5f
     };
 
-    _glGenVertexArrays(1, &klombleVAO);
-    _glBindVertexArray(klombleVAO);
+    gl.genVertexArrays(1, &renderer2D.vao);
+    gl.bindVertexArray(renderer2D.vao);
     
-    _glGenBuffers(1, &klombleVBO);
-    _glBindBuffer(GL_ARRAY_BUFFER, klombleVBO);
+    gl.genBuffers(1, &renderer2D.vbo);
+    gl.bindBuffer(GL_ARRAY_BUFFER, renderer2D.vbo);
     
-    _glBufferData(GL_ARRAY_BUFFER, sizeof(shapes), shapes, GL_STATIC_DRAW);
+    gl.bufferData(GL_ARRAY_BUFFER, sizeof(shapes), shapes, GL_STATIC_DRAW);
     
-    _glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    _glEnableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    gl.enableVertexAttribArray(0);
 
-    // 3d
+    // uses same fragment shader as 2d
     
-    GLuint vs3D = _glCreateShader(GL_VERTEX_SHADER);
-    _glShaderSource(vs3D, 1, &vertexShader3DSource, NULL);
-    _glCompileShader(vs3D);
+    GLuint vs3D = gl.createShader(GL_VERTEX_SHADER);
+    gl.shaderSource(vs3D, 1, &vertexShader3DSource, NULL);
+    gl.compileShader(vs3D);
     
-    klomble3DProgram = _glCreateProgram();
-    _glAttachShader(klomble3DProgram, vs3D);
-    _glAttachShader(klomble3DProgram, fragmentShader);
-    _glLinkProgram(klomble3DProgram);
+    renderer3D.program = gl.createProgram();
+    gl.attachShader(renderer3D.program, vs3D);
+    gl.attachShader(renderer3D.program, fragmentShader);
+    gl.linkProgram(renderer3D.program);
 
-    k3DUOffset = _glGetUniformLocation(klomble3DProgram, "uOffset");
-    k3DUScale = _glGetUniformLocation(klomble3DProgram, "uScale");
-    k3DURotation = _glGetUniformLocation(klomble3DProgram, "uRotation");
-    k3DUColor = _glGetUniformLocation(klomble3DProgram, "uColor");
-    k3DUAspect = _glGetUniformLocation(klomble3DProgram, "uAspect");
+    renderer3D.uOffset = gl.getUniformLocation(renderer3D.program, "uOffset");
+    renderer3D.uScale = gl.getUniformLocation(renderer3D.program, "uScale");
+    renderer3D.uRotation = gl.getUniformLocation(renderer3D.program, "uRotation");
+    renderer3D.uColor = gl.getUniformLocation(renderer3D.program, "uColor");
+    renderer3D.uAspect = gl.getUniformLocation(renderer3D.program, "uAspect");
+
+    renderer3D.uCamPos = gl.getUniformLocation(renderer3D.program, "uCamPos");
+    renderer3D.uCamRot = gl.getUniformLocation(renderer3D.program, "uCamRot");
+
+    // cube verticies
 
     float cubeVertices[] = {
         -0.5f,-0.5f,-0.5f,  0.5f,-0.5f,-0.5f,  0.5f, 0.5f,-0.5f,  0.5f, 0.5f,-0.5f, -0.5f, 0.5f,-0.5f, -0.5f,-0.5f,-0.5f,
@@ -325,27 +443,33 @@ static void klombleInitGL()
         -0.5f, 0.5f,-0.5f,  0.5f, 0.5f,-0.5f,  0.5f, 0.5f, 0.5f,  0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f,-0.5f
     };
 
-    _glGenVertexArrays(1, &klombleCubeVAO);
-    _glGenBuffers(1, &klombleCubeVBO);
-    _glBindVertexArray(klombleCubeVAO);
-    _glBindBuffer(GL_ARRAY_BUFFER, klombleCubeVBO);
-    _glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-    _glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    _glEnableVertexAttribArray(0);
+    gl.genVertexArrays(1, &renderer3D.cubeVAO);
+    gl.genBuffers(1, &renderer3D.cubeVBO);
+    gl.bindVertexArray(renderer3D.cubeVAO);
+    gl.bindBuffer(GL_ARRAY_BUFFER, renderer3D.cubeVBO);
+    gl.bufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    gl.vertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    gl.enableVertexAttribArray(0);
 
-    klombleGLReady = 1;
+    glReady = true;
 }
+
+} // namespace
 
 #endif
 
 // klomble windwo
 
 #ifdef _WIN32
-    static LARGE_INTEGER klombleTimeFrequency;
-    static LARGE_INTEGER klombleTimeLast;
-    static float klombleDeltaTime = 0.0f;
+    namespace {
+        // delta time
 
-    static bool klombleKeys[256] = { false };
+        LARGE_INTEGER timeFrequency;
+        LARGE_INTEGER timeLast;
+        float deltaTime = 0.0f;
+
+        bool keys[256] = { false };
+    }
 
     static LRESULT CALLBACK KlombleWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
@@ -353,24 +477,94 @@ static void klombleInitGL()
             // keyboard input
 
             case WM_KEYDOWN:
-                if (wParam >= 0 && wParam < 256) klombleKeys[wParam] = true;
+                if (wParam >= 0 && wParam < 256) keys[wParam] = true;
                 return 0;
+
             case WM_KEYUP:
-                if (wParam >= 0 && wParam < 256) klombleKeys[wParam] = false;
+                if (wParam >= 0 && wParam < 256) keys[wParam] = false;
                 return 0;
 
             case WM_PAINT:
                 ValidateRect(hwnd, NULL);
                 return 0;
+
             case WM_DESTROY:
             case WM_CLOSE:
                 PostQuitMessage(0);
                 return 0;
-            default:
-                return DefWindowProc(hwnd, uMsg, wParam, lParam);
         }
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 #endif
+
+inline void klombleClearBackground(KlombleWindow* window, Klomble::Color color) 
+{
+    if (!window) return;
+
+    #ifdef _WIN32
+        wglMakeCurrent((HDC)window->deviceContext, (HGLRC)window->renderingContext);
+        glClearColor(color.r, color.g, color.b, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    #endif
+}
+
+// shapes
+
+inline void klombleDrawCube(KlombleWindow* window, Klomble::Vec3 position, float size, Klomble::Vec3 rotation, Klomble::Color color)
+{
+    if (!window) return;
+
+    #ifdef _WIN32
+        wglMakeCurrent((HDC)window->deviceContext, (HGLRC)window->renderingContext);
+
+        // recompute aspect every draw call in case the window got resized
+
+        RECT rect;
+        GetClientRect((HWND)window->handle, &rect);
+        float aspect = (float)(rect.right - rect.left) / (float)(rect.bottom - rect.top);
+
+        gl.useProgram(renderer3D.program);
+
+        if (activeCamera) {
+            gl.uniform3f(renderer3D.uCamPos, activeCamera->position.x, activeCamera->position.y, activeCamera->position.z);
+            gl.uniform3f(renderer3D.uCamRot, activeCamera->rotation.x, activeCamera->rotation.y, activeCamera->rotation.z);
+        } else {
+            gl.uniform3f(renderer3D.uCamPos, 0, 0, 0);
+            gl.uniform3f(renderer3D.uCamRot, 0, 0, 0);
+        }
+        
+        gl.uniform3f(renderer3D.uOffset, position.x, position.y, position.z);
+        gl.uniform3f(renderer3D.uRotation, rotation.x, rotation.y, rotation.z);
+        gl.uniform1f(renderer3D.uScale, size);
+        gl.uniform1f(renderer3D.uAspect, aspect);
+        gl.uniform3f(renderer3D.uColor, color.r, color.g, color.b);
+
+        gl.bindVertexArray(renderer3D.cubeVAO); 
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    #endif
+}
+
+inline void klombleDrawTriangle(KlombleWindow* window, Klomble::Vec2 position, float size, float rotation, Klomble::Color color)
+{
+    if (!window) return;
+
+    #ifdef _WIN32
+        wglMakeCurrent((HDC)window->deviceContext, (HGLRC)window->renderingContext);
+
+        gl.useProgram(renderer2D.program);
+        
+        gl.uniform2f(renderer2D.uOffset, position.x, position.y);
+        gl.uniform1f(renderer2D.uScale, size);
+        gl.uniform1f(renderer2D.uRotation, rotation);
+        gl.uniform3f(renderer2D.uColor, color.r, color.g, color.b);
+
+        gl.bindVertexArray(renderer2D.vao); 
+        
+        // start at vertex 4 and draw 3 vertices
+
+        glDrawArrays(GL_TRIANGLES, 4, 3); 
+    #endif
+}
 
 inline KlombleWindow* klombleCreateWindow(int width, int height, const char* title)
 {
@@ -379,6 +573,9 @@ inline KlombleWindow* klombleCreateWindow(int width, int height, const char* tit
     window->height = height;
 
     #ifdef _WIN32
+
+        // register the window class
+
         HINSTANCE hInstance = GetModuleHandle(NULL);
         const char* className = "KlombleWindowClass";
 
@@ -405,6 +602,8 @@ inline KlombleWindow* klombleCreateWindow(int width, int height, const char* tit
 
         HDC hdc = GetDC(hwnd);
 
+        // get 32 bit RGBA double buffered depth capable pixel format
+
         PIXELFORMATDESCRIPTOR pfd = {0};
         pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
         pfd.nVersion = 1;
@@ -425,50 +624,13 @@ inline KlombleWindow* klombleCreateWindow(int width, int height, const char* tit
         window->deviceContext = (void*)hdc;
         window->renderingContext = (void*)hglrc;
 
-        klombleInitGL();
+        initGL();
 
-        QueryPerformanceFrequency(&klombleTimeFrequency);
-        QueryPerformanceCounter(&klombleTimeLast);
+        QueryPerformanceFrequency(&timeFrequency);
+        QueryPerformanceCounter(&timeLast);
     #endif
 
     return window;
-}
-
-inline void klombleClearBackground(KlombleWindow* window, Klomble::Color color) 
-{
-    if (!window) return;
-
-    #ifdef _WIN32
-        wglMakeCurrent((HDC)window->deviceContext, (HGLRC)window->renderingContext);
-        glClearColor(color.r, color.g, color.b, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    #endif
-}
-
-// shapes
-
-inline void klombleDrawCube(KlombleWindow* window, Klomble::Vec3 position, float size, Klomble::Vec3 rotation, Klomble::Color color)
-{
-    if (!window) return;
-
-    #ifdef _WIN32
-        wglMakeCurrent((HDC)window->deviceContext, (HGLRC)window->renderingContext);
-
-        RECT rect;
-        GetClientRect((HWND)window->handle, &rect);
-        float aspect = (float)(rect.right - rect.left) / (float)(rect.bottom - rect.top);
-
-        _glUseProgram(klomble3DProgram);
-        
-        _glUniform3f(k3DUOffset, position.x, position.y, position.z);
-        _glUniform3f(k3DURotation, rotation.x, rotation.y, rotation.z);
-        _glUniform1f(k3DUScale, size);
-        _glUniform1f(k3DUAspect, aspect);
-        _glUniform3f(k3DUColor, color.r, color.g, color.b);
-
-        _glBindVertexArray(klombleCubeVAO); 
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    #endif
 }
 
 inline void klombleDrawSquare(KlombleWindow* window, Klomble::Vec2 position, float size, float rotation, Klomble::Color color)
@@ -478,52 +640,17 @@ inline void klombleDrawSquare(KlombleWindow* window, Klomble::Vec2 position, flo
     #ifdef _WIN32
         wglMakeCurrent((HDC)window->deviceContext, (HGLRC)window->renderingContext);
 
-        _glUseProgram(klombleProgram);
+        gl.useProgram(renderer2D.program);
         
-        _glUniform2f(klombleUOffset, position.x, position.y);
-        _glUniform1f(klombleUScale, size);
-        _glUniform1f(klombleURotation, rotation);
-        _glUniform3f(klombleUColor, color.r, color.g, color.b);
+        gl.uniform2f(renderer2D.uOffset, position.x, position.y);
+        gl.uniform1f(renderer2D.uScale, size);
+        gl.uniform1f(renderer2D.uRotation, rotation);
+        gl.uniform3f(renderer2D.uColor, color.r, color.g, color.b);
 
-        _glBindVertexArray(klombleVAO);
+        gl.bindVertexArray(renderer2D.vao);
         
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4); 
     #endif
-}
-
-inline void klombleDrawTriangle(KlombleWindow* window, Klomble::Vec2 position, float size, float rotation, Klomble::Color color)
-{
-    if (!window) return;
-
-    #ifdef _WIN32
-        wglMakeCurrent((HDC)window->deviceContext, (HGLRC)window->renderingContext);
-
-        _glUseProgram(klombleProgram);
-        
-        _glUniform2f(klombleUOffset, position.x, position.y);
-        _glUniform1f(klombleUScale, size);
-        _glUniform1f(klombleURotation, rotation);
-        _glUniform3f(klombleUColor, color.r, color.g, color.b);
-
-        _glBindVertexArray(klombleVAO); 
-        
-        // start at vertex 4 and draw 3 vertices
-        glDrawArrays(GL_TRIANGLES, 4, 3); 
-    #endif
-}
-
-inline void klombleCloseWindow(KlombleWindow* window)
-{
-    if (!window) return;
-
-    #ifdef _WIN32
-        wglMakeCurrent(NULL, NULL);
-        wglDeleteContext((HGLRC)window->renderingContext);
-        ReleaseDC((HWND)window->handle, (HDC)window->deviceContext);
-        DestroyWindow((HWND)window->handle);
-    #endif
-
-    free(window);
 }
 
 inline int klombleUpdate(KlombleWindow* window)
@@ -533,11 +660,13 @@ inline int klombleUpdate(KlombleWindow* window)
     #ifdef _WIN32
         SwapBuffers((HDC)window->deviceContext); 
 
+        // add to clock
+
         LARGE_INTEGER currentTime;
         QueryPerformanceCounter(&currentTime);
 
-        klombleDeltaTime = (float)((currentTime.QuadPart - klombleTimeLast.QuadPart) / (double)klombleTimeFrequency.QuadPart);
-        klombleTimeLast = currentTime;
+        deltaTime = (float)((currentTime.QuadPart - timeLast.QuadPart) / (double)timeFrequency.QuadPart);
+        timeLast = currentTime;
 
         MSG msg;
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -555,7 +684,7 @@ inline int klombleUpdate(KlombleWindow* window)
 inline float klombleGetDeltaTime() 
 {
     #ifdef _WIN32
-        return klombleDeltaTime;
+        return deltaTime;
     #else
         return 0.016f;
     #endif
@@ -564,7 +693,122 @@ inline float klombleGetDeltaTime()
 inline bool klombleIsKeyDown(int key) 
 {
     if (key >= 0 && key < 256) {
-        return klombleKeys[key];
+        return keys[key];
     }
     return false;
 }
+
+inline void klombleCloseWindow(KlombleWindow* window)
+{
+    if (!window) return;
+
+    #ifdef _WIN32
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext((HGLRC)window->renderingContext);
+        ReleaseDC((HWND)window->handle, (HDC)window->deviceContext);
+        DestroyWindow((HWND)window->handle);
+    #endif
+
+    free(window);
+}
+
+// camera
+
+inline void klombleSetActiveCamera(Klomble::Camera3D* cam)
+{
+    activeCamera = cam;
+}
+
+inline void klombleUpdateFreeCamera(KlombleWindow* window, Klomble::Camera3D& cam, float speed, float sensitivity) {
+
+    RECT rect;
+    GetClientRect((HWND)window->handle, &rect);
+    POINT center = { (rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2 };
+
+    POINT p;
+    GetCursorPos(&p);
+    ScreenToClient((HWND)window->handle, &p);
+
+    cam.lastMousePos = cam.mousePos;
+    cam.mousePos = { (float)p.x, (float)p.y };
+
+    float dt = klombleGetDeltaTime();
+    float move = speed * dt;
+
+    float yaw = cam.rotation.y * 3.14159265f / 180.0f;
+
+    Klomble::Vec3 forward(-std::sin(yaw), 0.0f, -std::cos(yaw));
+
+    Klomble::Vec3 right(std::cos(yaw), 0.0f, -std::sin(yaw));
+
+    if (klombleIsKeyDown(Klomble::W))
+    {
+        cam.position.x += forward.x * move;
+        cam.position.z += forward.z * move;
+    }
+
+    if (klombleIsKeyDown(Klomble::S))
+    {
+        cam.position.x -= forward.x * move;
+        cam.position.z -= forward.z * move;
+    }
+
+    if (klombleIsKeyDown(Klomble::A))
+    {
+        cam.position.x -= right.x * move;
+        cam.position.z -= right.z * move;
+    }
+
+    if (klombleIsKeyDown(Klomble::D))
+    {
+        cam.position.x += right.x * move;
+        cam.position.z += right.z * move;
+    }
+
+    float dx = (float)p.x - (float)center.x;
+    float dy = (float)p.y - (float)center.y;
+
+    cam.rotation.y += -(dx * sensitivity);
+    cam.rotation.x += -(dy * sensitivity);
+    cam.rotation.x = std::max(-89.0f, std::min(89.0f, cam.rotation.x)); // clamp
+
+    // center mouse for next frame
+
+    POINT screenCenter = center;
+    ClientToScreen((HWND)window->handle, &screenCenter);
+    SetCursorPos(screenCenter.x, screenCenter.y);
+}
+
+void klombleLogError(const char* message)
+{
+    fprintf(stderr, "[Klomble Error] %s\n", message);
+}
+
+inline void* klombleLoadGLFunction(const char* name)
+{
+    void* ptr = (void*)wglGetProcAddress(name);
+
+    // some drivers return invalid values
+
+    if (ptr == 0 ||
+        ptr == (void*)0x1 ||
+        ptr == (void*)0x2 ||
+        ptr == (void*)0x3 ||
+        ptr == (void*)-1)
+    {
+        HMODULE module = LoadLibraryA("opengl32.dll");
+        if (module)
+            ptr = (void*)GetProcAddress(module, name);
+    }
+
+    if (!ptr)
+    {
+        fprintf(stderr,
+            "[Klomble] Failed to load OpenGL function: %s\n",
+            name);
+    }
+
+    return ptr;
+}
+
+#endif
