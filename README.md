@@ -16,7 +16,7 @@
 
 ## Features
 
-* **Single-Header Simplicity:** Just drop `#include "Klomble.h"` into your project and you're ready to code.
+* **Single-Header Simplicity:** Just drop `#define KLOMBLE_IMPLEMENTATION and #include "Klomble.h"` into your project and you're ready to code.
 * **Modern OpenGL Pipeline:** Klomble uses modern OpenGL for maximum performance on both new and old hardware.
 * **2D & 3D Rendering:** Draw Squares, triangles, cubes with just a single function!
 * **Simple Input API:** User friendly keyboard input system!
@@ -75,7 +75,7 @@ It's that simple!
 
 **2.** Place it in your C++ project
 
-**3.** Include it using #include <klomble.h>
+**3.** Include it using #define KLOMBLE_IMPLEMENTATION, then add #include <klomble.h>
 
 **4.** Start coding!
 
