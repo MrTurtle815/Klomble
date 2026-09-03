@@ -16,6 +16,6 @@ Thankyou to the couple of libraries I used in this project, all helping me build
 - rlImGui by raylib-extras [GitHub Repository](https://github.com/raylib-extras/rlImGui)
 - ImGui by ocornut [GitHub Repository](https://github.com/ocornut/imgui)
 
-# ****
+****
 
 ⭐ Feel free to star the repository if you are interested :-)
