@@ -12,7 +12,6 @@ I chose the General Public License (GPL) for this project as I would like to all
 # **Libraries**
 Thankyou to the couple of libraries I used in this project, all helping me build Klomble better and faster! Here are the list of libraries I used:
 - Raylib by raysan5 [GitHub Repository](https://github.com/raysan5/raylib)
-- GLFW by Marcus Geelnard & Camilla Löwy [GitHub Repository](https://github.com/glfw/glfw)
 - rlImGui by raylib-extras [GitHub Repository](https://github.com/raylib-extras/rlImGui)
 - ImGui by ocornut [GitHub Repository](https://github.com/ocornut/imgui)
 
