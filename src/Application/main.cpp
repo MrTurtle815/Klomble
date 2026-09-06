@@ -1,30 +1,9 @@
-#include <GLFW/glfw3.h>
+// headers
 
-int main(void)
+#include "application.h"
+
+int main()
 {
-
-    if (!glfwInit())
-        return -1;
-
-    GLFWwindow* window = glfwCreateWindow(640, 480, "Klomble", NULL, NULL);
-    
-    if (!window)
-    {
-        glfwTerminate();
-        return -1;
-    }
-
-    glfwMakeContextCurrent(window);
-
-    while (!glfwWindowShouldClose(window))
-    {
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glfwSwapBuffers(window);
-
-        glfwPollEvents();
-    }
-
-    glfwTerminate();
+    application app;
     return 0;
 }
