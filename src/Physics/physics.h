@@ -3,4 +3,6 @@
 #include <raylib/raylib.h>
 #include <raylib/raymath.h>
 
-void updatePhysics(float deltaTime);
+class World; 
+
+void updatePhysics(float deltaTime, World& mainWorld);

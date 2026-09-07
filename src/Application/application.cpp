@@ -30,10 +30,17 @@ void application::run()
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
+    World world;
+
     auto brick = std::make_unique<Brick>(
-    Vector3{0.0f, 0.0f, 0.0f}, 
-    Vector3{2.0f, 1.0f, 4.0f}, 
+    Vector3{0.0f, 0.0f, 0.0f}, // pos
+    Vector3{2.0f, 1.0f, 4.0f}, // size
+    Vector3{0.0f, 0.0f, 0.0f}, // velocity
+    Vector3{0.0f, 0.0f, 0.0f}, // force
+    5.0f, // mass
     RED);
+
+    world.addBrick(std::move(brick));
 
     DisableCursor();
     
@@ -42,7 +49,7 @@ void application::run()
         UpdateCamera(&camera, CAMERA_FREE);
 
         float deltaTime = GetFrameTime();
-        updatePhysics(deltaTime);
+        updatePhysics(deltaTime, world);
 
         BeginDrawing();
 
@@ -50,7 +57,7 @@ void application::run()
 
             BeginMode3D(camera);
 
-            brick->draw();
+            world.drawWorld();
 
             EndMode3D();
         

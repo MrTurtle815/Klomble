@@ -1,18 +1,25 @@
 // headers
 
 #include "physics.h"
+#include "../Scene/scene.h"
+#include "../values.h"
 
-void updatePhysics(float deltaTime)
+void updateGravity(Brick& brick, float deltaTime)
 {
-
-}
-
-void updateGravity()
-{
-
+    brick.velocity.y += -gravity * deltaTime;
+    brick.position.y += brick.velocity.y * deltaTime;
 }
 
 void checkCollisions()
 {
 
+}
+
+void updatePhysics(float deltaTime, World& mainWorld)
+{
+    const auto& bricks = mainWorld.getBricks();
+    
+    for (const auto& brickPtr : bricks) {
+        updateGravity(*brickPtr, deltaTime);
+    }
 }
