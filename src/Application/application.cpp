@@ -3,6 +3,7 @@
 #include "../values.h"
 #include "../Render/render.h"
 #include "../Scene/scene.h"
+#include "../Physics/physics.h"
 #include "application.h"
 
 // utils
@@ -18,6 +19,8 @@ application::application()
 
 void application::run()
 {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE); 
+    SetTargetFPS(60);
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, TITLE);
 
     Camera3D camera = { 0 };
@@ -27,16 +30,19 @@ void application::run()
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
-    SetTargetFPS(60);
-
     auto brick = std::make_unique<Brick>(
     Vector3{0.0f, 0.0f, 0.0f}, 
     Vector3{2.0f, 1.0f, 4.0f}, 
     RED);
 
+    DisableCursor();
+    
     while (!WindowShouldClose())
     {
         UpdateCamera(&camera, CAMERA_FREE);
+
+        float deltaTime = GetFrameTime();
+        updatePhysics(deltaTime);
 
         BeginDrawing();
 
@@ -45,7 +51,6 @@ void application::run()
             BeginMode3D(camera);
 
             brick->draw();
-            renderScene();
 
             EndMode3D();
         
