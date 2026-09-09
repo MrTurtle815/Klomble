@@ -4,6 +4,7 @@
 #include "../Render/render.h"
 #include "../Scene/scene.h"
 #include "../Physics/physics.h"
+#include "../UI/ui.h"
 #include "application.h"
 
 // utils
