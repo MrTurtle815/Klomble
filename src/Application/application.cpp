@@ -44,6 +44,7 @@ void application::run()
     world.addBrick(std::move(brick));
 
     DisableCursor();
+    initImGui();
     
     while (!WindowShouldClose())
     {
@@ -61,14 +62,20 @@ void application::run()
             world.drawWorld();
 
             EndMode3D();
-        
+
+            rlImGuiBegin();
+
+            drawUi();
+
+            rlImGuiEnd();
+
         EndDrawing();
     }
-
-    CloseWindow();
 }
 
 application::~application()
 {
+    CloseWindow();
+    rlImGuiShutdown();
     printf("Closing Program...");
 }
