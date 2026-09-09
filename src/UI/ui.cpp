@@ -1,6 +1,11 @@
 // headers
 
+#include "../Application/application.h"
 #include "ui.h"
+
+// utils
+
+#include <stdio.h>
 
 void initImGui()
 {
@@ -17,26 +22,29 @@ void drawUi()
 		ImGui::DockSpaceOverViewport(0,  NULL, ImGuiDockNodeFlags_PassthruCentralNode);
     #endif
 
-    if (ImGui::BeginMainMenuBar())
-		{
-			if (ImGui::BeginMenu("File"))
-			{
-				ImGui::EndMenu();
-            }
-
-			if (ImGui::BeginMenu("Window"))
+    if(ImGui::BeginMainMenuBar())
+    {
+        if(ImGui::BeginMenu("File"))
+        {           
+            if (ImGui::MenuItem("Klomble"))
             {
-                ImGui::EndMenu();
+                printf("weeeeee");
             }
-			ImGui::EndMainMenuBar();
-		}
 
-		// show some windows
+            if (ImGui::MenuItem("Quit"))
+            {
+                
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
+    }
 	
-		if (ImGui::Begin("Test Window"))
-		{
-			ImGui::TextUnformatted("Another window");
-		}
+	if (ImGui::Begin("Explorer"))
+	{
+        ImGui::Text("Brick");
+	}
 
 	ImGui::End();
 }
