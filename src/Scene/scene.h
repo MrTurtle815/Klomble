@@ -1,3 +1,5 @@
+#pragma once
+
 // libraries
 
 #include <raylib/raylib.h>
@@ -21,13 +23,15 @@ struct Instance
 
     Color color; 
 
-    Instance(Vector3 pos, Vector3 sz, Vector3 vel, Vector3 frce, float mas, Color col) : position(pos), size(sz), velocity(vel), force(frce), mass(mas), color(col) {} 
+    int identification;
+
+    Instance(Vector3 pos, Vector3 sz, Vector3 vel, Vector3 frce, float mas, Color col, int id) : position(pos), size(sz), velocity(vel), force(frce), mass(mas), color(col), identification(id) {} 
 };
 
 class Brick : public Instance
 {
 public: 
-    Brick(Vector3 pos, Vector3 sz, Vector3 vel, Vector3 frce, float mas, Color col) : Instance(pos, sz, vel, frce, mas, col) {} 
+    Brick(Vector3 pos, Vector3 sz, Vector3 vel, Vector3 frce, float mas, Color col, int id) : Instance(pos, sz, vel, frce, mas, col, id) {} 
 
     void draw()
     {

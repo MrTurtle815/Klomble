@@ -39,7 +39,8 @@ void application::run()
     Vector3{0.0f, 0.0f, 0.0f}, // velocity
     Vector3{0.0f, 0.0f, 0.0f}, // force
     5.0f, // mass
-    RED);
+    RED, // colour
+    1); // id
 
     world.addBrick(std::move(brick));
 
@@ -65,7 +66,7 @@ void application::run()
 
             rlImGuiBegin();
 
-            drawUi();
+            drawUi(world);
 
             rlImGuiEnd();
 

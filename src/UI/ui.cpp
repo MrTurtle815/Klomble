@@ -1,11 +1,14 @@
 // headers
 
 #include "../Application/application.h"
+#include "../Scene/scene.h"
 #include "ui.h"
 
 // utils
 
 #include <stdio.h>
+#include <vector>
+#include <string>
 
 void initImGui()
 {
@@ -16,7 +19,7 @@ void initImGui()
     #endif
 }
 
-void drawUi()
+void drawUi(World& world)
 {
     #ifdef IMGUI_HAS_DOCK
 		ImGui::DockSpaceOverViewport(0,  NULL, ImGuiDockNodeFlags_PassthruCentralNode);
@@ -43,7 +46,11 @@ void drawUi()
 	
 	if (ImGui::Begin("Explorer"))
 	{
-        ImGui::Text("Brick");
+        for (auto& brick : world.getBricks())
+        {
+            const char* idString = std::to_string(brick->identification).c_str();
+            ImGui::MenuItem(idString);
+        }
 	}
 
 	ImGui::End();
