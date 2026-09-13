@@ -55,7 +55,7 @@ void application::run()
 
         BeginDrawing();
 
-            ClearBackground(RAYWHITE);
+            ClearBackground(SKYBLUE);
 
             BeginMode3D(camera);
 
